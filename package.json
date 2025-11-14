@@ -1,5 +1,5 @@
 {
-      "name": "Cyber Fraud Support System",
+      "name": "cyber-fraud-support-system",
       "version": "0.1.0",
       "private": true,
       "dependencies": {
@@ -57,5 +57,19 @@
       "scripts": {
             "dev": "vite",
             "build": "vite build"
-      }
+      },
+      "description": "Run `npm i` to install the dependencies.",
+      "main": "index.js",
+      "repository": {
+            "type": "git",
+            "url": "git+https://github.com/ishan7978/ScamShield.git"
+      },
+      "keywords": [],
+      "author": "",
+      "license": "ISC",
+      "type": "commonjs",
+      "bugs": {
+            "url": "https://github.com/ishan7978/ScamShield/issues"
+      },
+      "homepage": "https://github.com/ishan7978/ScamShield#readme"
 }
