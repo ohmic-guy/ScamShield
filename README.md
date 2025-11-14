@@ -1,9 +1,9 @@
-## Team Blitzkrieg (Team No: 32)
+## Team Blitzkrieg (Team No: 31)
 ### Members: 
-**1.**- Ommkar Ankit Rout (Leader)
-**2**- Subha Priyadarshan Panda (AI/ML Developer)
-**3**- Shreyans Behera (Backend & Database)
-**4**- Auro Anupam Das (Frontend Developer)
+#### **1.**- Ommkar Ankit Rout (Leader)
+#### **2**- Subha Priyadarshan Panda (AI/ML Developer)
+#### **3**- Shreyans Behera (Backend & Database)
+#### **4**- Auro Anupam Das (Frontend Developer)
 ## College: Trident Academy of Technology
 
 
