@@ -3,3 +3,4 @@ frontend/node_modules/
 backend/Database/cyber_fraud.db
 backend/Database/__pycache__/
 backend/Alerts/__pycache__/
+node_modules/
