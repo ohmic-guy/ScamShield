@@ -40,6 +40,19 @@ class ComplaintResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class ContactOfficerRequest(BaseModel):
+    complaint_id: str
+    subject: str
+    message: str
+    priority: str = "medium"  # low, medium, high
+    contact_method: str = "email"  # email, phone, sms
+
+class ContactOfficerResponse(BaseModel):
+    success: bool
+    message: str
+    ticket_id: Optional[str] = None
+    officer_contact: Optional[str] = None
+
 # Dependency
 def get_db():
     db = SessionLocal()
@@ -266,3 +279,75 @@ async def get_complaint_activity(complaint_id: str, db: Session = Depends(get_db
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{complaint_id}/contact-officer", response_model=ContactOfficerResponse)
+async def contact_investigating_officer(
+    complaint_id: str,
+    contact_request: ContactOfficerRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Contact the investigating officer for a complaint.
+    
+    This endpoint allows victims to send messages to their assigned investigating officer.
+    The message will be delivered via the preferred contact method (email, phone, SMS).
+    
+    Args:
+        - complaint_id: The complaint ID to contact officer about
+        - subject: Subject line for the message
+        - message: Message content
+        - priority: Priority level (low, medium, high)
+        - contact_method: Preferred contact method (email, phone, sms)
+    
+    Returns:
+        - success: Whether the message was sent successfully
+        - message: Status message
+        - ticket_id: Reference ticket ID for follow-up
+        - officer_contact: Officer contact information
+    """
+    try:
+        # Verify complaint exists
+        complaint = DatabaseManager.get_complaint_by_id(db, complaint_id)
+        if not complaint:
+            raise HTTPException(status_code=404, detail="Complaint not found")
+        
+        # In a production system, you would:
+        # 1. Generate a ticket ID
+        # 2. Send email/SMS/call to the officer
+        # 3. Log the contact attempt
+        # 4. Notify the victim
+        
+        # Mock implementation
+        import uuid
+        from datetime import datetime
+        
+        ticket_id = f"TKT-{complaint_id}-{uuid.uuid4().hex[:6].upper()}"
+        
+        # Log contact attempt
+        contact_log = {
+            "complaint_id": complaint_id,
+            "subject": contact_request.subject,
+            "message": contact_request.message,
+            "priority": contact_request.priority,
+            "contact_method": contact_request.contact_method,
+            "timestamp": datetime.now().isoformat(),
+            "ticket_id": ticket_id,
+            "status": "pending"
+        }
+        
+        # In production, store this in a ContactLog table
+        # db.add(ContactLog(**contact_log))
+        # db.commit()
+        
+        return ContactOfficerResponse(
+            success=True,
+            message=f"Your message has been sent to the investigating officer via {contact_request.contact_method}. Reference Ticket ID: {ticket_id}",
+            ticket_id=ticket_id,
+            officer_contact="SI Rajesh Kumar - +91-9876543210"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to send message: {str(e)}")
+

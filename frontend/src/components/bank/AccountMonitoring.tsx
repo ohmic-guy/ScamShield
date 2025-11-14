@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Search, Lock, Unlock, Eye, Download } from 'lucide-react';
+import { Search, Lock, Unlock, Eye, Download, Loader } from 'lucide-react';
+import { exportAsCSV, exportAsText, downloadBlob } from '@/services/exportService';
 
 export function AccountMonitoring() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const frozenAccounts = [
     {
@@ -60,6 +62,75 @@ export function AccountMonitoring() {
     acc.accountNumber.includes(searchQuery) ||
     acc.complaintId.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleExportAccounts = async () => {
+    try {
+      setExportLoading(true);
+
+      // Export frozen accounts as CSV
+      const accountsCSV = filteredAccounts.map(acc => ({
+        'Account Number': acc.accountNumber,
+        'Account Holder': acc.accountHolder,
+        'Status': acc.status,
+        'IFSC Code': acc.ifsc,
+        'Branch': acc.branch,
+        'Frozen Date': acc.frozenDate,
+        'Frozen Amount (₹)': acc.frozenAmount.replace('₹', ''),
+        'Complaint ID': acc.complaintId
+      }));
+
+      exportAsCSV(accountsCSV, `frozen_accounts_${new Date().toISOString().split('T')[0]}.csv`);
+
+      // Also create a detailed text report
+      const reportContent = `
+╔════════════════════════════════════════════════════════════════╗
+║           FROZEN ACCOUNTS REPORT                              ║
+║           State Bank of India - Cyber Crime Cell              ║
+╚════════════════════════════════════════════════════════════════╝
+
+Report Generated: ${new Date().toLocaleDateString()}
+Total Frozen Accounts: ${filteredAccounts.length}
+
+─────────────────────────────────────────────────────────────────
+FROZEN ACCOUNTS SUMMARY
+─────────────────────────────────────────────────────────────────
+${filteredAccounts
+  .map(
+    acc => `
+Account: ${acc.accountNumber}
+Holder: ${acc.accountHolder}
+Branch: ${acc.branch}
+Status: ${acc.status}
+Amount: ${acc.frozenAmount}
+Complaint ID: ${acc.complaintId}
+Frozen Date: ${acc.frozenDate}
+────────────────────────────────────────────────────────────────`
+  )
+  .join('')}
+
+─────────────────────────────────────────────────────────────────
+ACCOUNT STATISTICS
+─────────────────────────────────────────────────────────────────
+
+Total Accounts: ${filteredAccounts.length}
+Frozen: ${filteredAccounts.filter(a => a.status === 'Frozen').length}
+Refunded: ${filteredAccounts.filter(a => a.status === 'Refunded').length}
+
+═════════════════════════════════════════════════════════════════
+
+For administrative use only. Contact: sbi.cybercell@sbi.co.in
+
+═════════════════════════════════════════════════════════════════
+      `;
+
+      exportAsText(reportContent, `frozen_accounts_${new Date().toISOString().split('T')[0]}.txt`);
+
+      setExportLoading(false);
+    } catch (error) {
+      console.error('Export failed:', error);
+      setExportLoading(false);
+    }
+  };
 
   return (
     <div className="p-8">
@@ -172,9 +243,17 @@ export function AccountMonitoring() {
               <div className="bg-white rounded-xl shadow-sm border p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-gray-900">Transaction History</h3>
-                  <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                    <Download className="h-5 w-5" />
-                    <span>Export</span>
+                  <button 
+                    onClick={handleExportAccounts}
+                    disabled={exportLoading}
+                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {exportLoading ? (
+                      <Loader className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Download className="h-5 w-5" />
+                    )}
+                    <span>{exportLoading ? 'Exporting...' : 'Export'}</span>
                   </button>
                 </div>
 

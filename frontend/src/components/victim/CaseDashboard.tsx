@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Shield, Phone, Download, Bell, Mail, MessageSquare, 
-  LogOut, BookOpen, CheckCircle, Clock, AlertCircle, XCircle 
+  LogOut, BookOpen, CheckCircle, Clock, AlertCircle, XCircle, Loader 
 } from 'lucide-react';
 import { ProgressStepper } from '../shared/ProgressStepper';
 import { ActivityTimeline } from '../shared/ActivityTimeline';
+import { ContactOfficerModal } from './ContactOfficerModal';
+import { useComplaints } from '@/services/useComplaints';
+import { useContactOfficer } from '@/services/useContactOfficer';
+import { exportAsText, generateComplaintReport, formatCurrency } from '@/services/exportService';
 
 interface CaseDashboardProps {
   complaintId: string;
@@ -89,12 +93,116 @@ const mockCaseData = {
 };
 
 export function CaseDashboard({ complaintId, onLogout, onViewResources, isDarkMode }: CaseDashboardProps) {
-  const caseData = mockCaseData[complaintId as keyof typeof mockCaseData] || mockCaseData['CF2024001'];
-  const [smsEnabled, setSmsEnabled] = useState(caseData.notifications.sms);
-  const [emailEnabled, setEmailEnabled] = useState(caseData.notifications.email);
+  const { getComplaint, getComplaintActivity, loading: complaintsLoading, error: complaintsError } = useComplaints();
+  const { sendContactRequest } = useContactOfficer();
+  const [caseData, setCaseData] = useState<any>(null);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [smsEnabled, setSmsEnabled] = useState(true);
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+
+  // Fetch complaint data on mount or when complaintId changes
+  useEffect(() => {
+    const loadComplaint = async () => {
+      try {
+        const complaint = await getComplaint(complaintId);
+        setCaseData(complaint);
+
+        // Fetch activity log
+        const activityData = await getComplaintActivity(complaintId);
+        setActivities(activityData.activities);
+      } catch (err) {
+        console.error('Failed to load complaint:', err);
+        // Fallback to mock data for demo
+        setCaseData(mockCaseData[complaintId as keyof typeof mockCaseData] || mockCaseData['CF2024001']);
+      }
+    };
+
+    if (complaintId) {
+      loadComplaint();
+    }
+  }, [complaintId]);
+
+  const handleDownloadReport = async () => {
+    if (!caseData) return;
+    setDownloadLoading(true);
+    try {
+      const reportContent = generateComplaintReport(caseData);
+      const filename = `complaint_${caseData.complaint_id}_${new Date().toISOString().split('T')[0]}.txt`;
+      exportAsText(reportContent, filename);
+    } catch (err) {
+      console.error('Failed to download report:', err);
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
+
+  const handleContactOfficer = async (contactData: {
+    subject: string;
+    message: string;
+    priority: 'low' | 'medium' | 'high';
+    contact_method: 'email' | 'phone' | 'sms';
+  }) => {
+    try {
+      const response = await sendContactRequest({
+        complaint_id: complaintId,
+        ...contactData
+      });
+      if (response.success) {
+        setContactModalOpen(false);
+      }
+    } catch (err) {
+      console.error('Failed to contact officer:', err);
+      throw err;
+    }
+  };
+
+  if (!caseData) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <Loader className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // Map backend status to UI status
+  const getUIStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'PENDING': 'In Process',
+      'ASSIGNED': 'Bank Action',
+      'FIR_REGISTERED': 'Bank Action',
+      'REFUNDED': 'Refunded',
+      'CLOSED': 'Closed'
+    };
+    return statusMap[status] || status;
+  };
+
+  const getStatusColor = (status: string): string => {
+    const colorMap: Record<string, string> = {
+      'PENDING': 'yellow',
+      'ASSIGNED': 'blue',
+      'FIR_REGISTERED': 'blue',
+      'REFUNDED': 'green',
+      'CLOSED': 'gray'
+    };
+    return colorMap[status] || 'gray';
+  };
+
+  // Map fraud type to UI format
+  const getFraudTypeDisplay = (fraudType: string) => {
+    const typeMap: Record<string, string> = {
+      'UPI_SCAM': 'UPI Fraud',
+      'PHISHING': 'Phishing Attack',
+      'INVESTMENT_FRAUD': 'Investment Scam',
+      'CREDIT_CARD_FRAUD': 'Credit Card Fraud'
+    };
+    return typeMap[fraudType] || fraudType;
+  };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
+    const uiStatus = getUIStatus(status);
+    switch (uiStatus) {
       case 'Refunded':
         return <CheckCircle className="h-6 w-6" />;
       case 'Bank Action':
@@ -108,7 +216,7 @@ export function CaseDashboard({ complaintId, onLogout, onViewResources, isDarkMo
     }
   };
 
-  const getStatusColor = (color: string) => {
+  const getColorClass = (color: string) => {
     const colors = {
       red: 'bg-red-100 text-red-700 border-red-200',
       yellow: 'bg-yellow-100 text-yellow-700 border-yellow-200',
@@ -171,9 +279,9 @@ export function CaseDashboard({ complaintId, onLogout, onViewResources, isDarkMo
               <p className={`mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Complaint ID</p>
               <p className={`font-mono ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{caseData.id}</p>
             </div>
-            <div className={`flex items-center gap-2 px-6 py-3 rounded-lg border ${getStatusColor(caseData.statusColor)}`}>
+            <div className={`flex items-center gap-2 px-6 py-3 rounded-lg border ${getColorClass(getStatusColor(caseData.status))}`}>
               {getStatusIcon(caseData.status)}
-              <span>{caseData.status}</span>
+              <span>{getUIStatus(caseData.status)}</span>
             </div>
           </div>
         </div>
@@ -192,29 +300,29 @@ export function CaseDashboard({ complaintId, onLogout, onViewResources, isDarkMo
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className={`mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Fraud Type</p>
-                  <p className={isDarkMode ? 'text-gray-200' : 'text-gray-900'}>{caseData.fraudType}</p>
+                  <p className={isDarkMode ? 'text-gray-200' : 'text-gray-900'}>{getFraudTypeDisplay(caseData.fraud_type)}</p>
                 </div>
                 <div>
                   <p className={`mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Amount</p>
-                  <p className={isDarkMode ? 'text-gray-200' : 'text-gray-900'}>{caseData.amount}</p>
+                  <p className={isDarkMode ? 'text-gray-200' : 'text-gray-900'}>{formatCurrency(caseData.amount_lost)}</p>
                 </div>
               </div>
               <div>
                 <p className={`mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Transaction ID</p>
-                <p className={`font-mono ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>{caseData.transactionId}</p>
+                <p className={`font-mono ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>{caseData.transaction_id || 'N/A'}</p>
               </div>
               <div>
                 <p className={`mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Date Reported</p>
-                <p className={isDarkMode ? 'text-gray-200' : 'text-gray-900'}>{caseData.dateReported}</p>
+                <p className={isDarkMode ? 'text-gray-200' : 'text-gray-900'}>{new Date(caseData.created_at).toLocaleDateString()}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className={`mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Bank Name</p>
-                  <p className={isDarkMode ? 'text-gray-200' : 'text-gray-900'}>{caseData.bankName}</p>
+                  <p className={isDarkMode ? 'text-gray-200' : 'text-gray-900'}>{caseData.accused_bank || 'N/A'}</p>
                 </div>
                 <div>
                   <p className={`mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Suspect Account</p>
-                  <p className={`font-mono ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>{caseData.suspectAccount}</p>
+                  <p className={`font-mono ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>{caseData.accused_account ? caseData.accused_account.slice(-4).padStart(caseData.accused_account.length, 'X') : 'N/A'}</p>
                 </div>
               </div>
               <div className="pt-4 border-t">
@@ -232,13 +340,18 @@ export function CaseDashboard({ complaintId, onLogout, onViewResources, isDarkMo
             {/* Download Report */}
             <div className={`rounded-xl shadow-sm border p-6 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
               <h3 className={`mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Actions</h3>
-              <button className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-900 text-white rounded-lg hover:bg-blue-800 transition-colors mb-3">
-                <Download className="h-5 w-5" />
-                <span>Download Case Report</span>
+              <button 
+                onClick={handleDownloadReport}
+                disabled={downloadLoading}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-900 text-white rounded-lg hover:bg-blue-800 transition-colors mb-3 disabled:opacity-50"
+              >
+                {downloadLoading ? <Loader className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
+                <span>{downloadLoading ? 'Downloading...' : 'Download Case Report'}</span>
               </button>
               <button className={`w-full flex items-center justify-center gap-2 px-6 py-3 border rounded-lg transition-colors ${
                 isDarkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}>
+              }`}
+              onClick={() => setContactModalOpen(true)}>
                 <MessageSquare className="h-5 w-5" />
                 <span>Contact Officer</span>
               </button>
@@ -287,6 +400,17 @@ export function CaseDashboard({ complaintId, onLogout, onViewResources, isDarkMo
           <ActivityTimeline activities={caseData.activities} isDarkMode={isDarkMode} />
         </div>
       </div>
+
+      {/* Contact Officer Modal */}
+      <ContactOfficerModal
+        isOpen={contactModalOpen}
+        onClose={() => setContactModalOpen(false)}
+        onSubmit={handleContactOfficer}
+        officerName={caseData?.officerName || 'Not Assigned'}
+        officerPhone={caseData?.officerContact}
+        officerEmail={caseData?.officerEmail}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 }

@@ -1,7 +1,10 @@
-import { Download, Calendar } from 'lucide-react';
+import { useState } from 'react';
+import { Download, Calendar, Loader } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { exportAsCSV, exportAsText, generateAnalyticsReport } from '@/services/exportService';
 
 export function Analytics() {
+  const [exportLoading, setExportLoading] = useState(false);
   const casesOverTime = [
     { month: 'Oct', cases: 145 },
     { month: 'Nov', cases: 178 },
@@ -37,6 +40,60 @@ export function Analytics() {
 
   const COLORS = ['#f97316', '#3b82f6', '#22c55e', '#eab308', '#8b5cf6'];
 
+  const handleExportAnalytics = async () => {
+    try {
+      setExportLoading(true);
+      
+      // Create analytics summary data
+      const analyticsData = {
+        period: {
+          start_date: 'October 2023',
+          end_date: 'March 2024'
+        },
+        total_cases: 1196,
+        total_lost: 8750000, // in rupees
+        total_recovered: 3680000,
+        recovery_rate: '42%',
+        resolved: 420,
+        pending: 280,
+        fraud_types: [
+          { fraud_type: 'UPI Fraud', count: 418, total_amount: 3050000 },
+          { fraud_type: 'Phishing', count: 298, total_amount: 2100000 },
+          { fraud_type: 'Investment Scam', count: 215, total_amount: 1900000 },
+          { fraud_type: 'Shopping Scam', count: 143, total_amount: 820000 },
+          { fraud_type: 'Others', count: 122, total_amount: 880000 }
+        ],
+        districts: [
+          { district: 'Bhubaneswar', cases: 280, recovery_rate: '45.2%' },
+          { district: 'Cuttack', cases: 198, recovery_rate: '41.3%' },
+          { district: 'Rourkela', cases: 165, recovery_rate: '38.9%' },
+          { district: 'Sambalpur', cases: 142, recovery_rate: '42.1%' },
+          { district: 'Puri', cases: 128, recovery_rate: '39.5%' }
+        ]
+      };
+
+      // Generate CSV data from fraud types
+      const csvData = analyticsData.fraud_types.map(ft => ({
+        'Fraud Type': ft.fraud_type,
+        'Cases': ft.count,
+        'Total Amount Lost (₹)': ft.total_amount,
+        'Average Per Case (₹)': Math.round(ft.total_amount / ft.count)
+      }));
+
+      // Export as CSV
+      exportAsCSV(csvData, `analytics_report_${new Date().toISOString().split('T')[0]}.csv`);
+
+      // Also export as text report
+      const textReport = generateAnalyticsReport(analyticsData);
+      exportAsText(textReport, `analytics_report_${new Date().toISOString().split('T')[0]}.txt`);
+
+      setExportLoading(false);
+    } catch (error) {
+      console.error('Export failed:', error);
+      setExportLoading(false);
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -49,9 +106,17 @@ export function Analytics() {
             <Calendar className="h-5 w-5 text-gray-600" />
             <span className="text-gray-700">Last 6 Months</span>
           </div>
-          <button className="flex items-center gap-2 px-6 py-3 bg-blue-900 text-white rounded-lg hover:bg-blue-800 transition-colors">
-            <Download className="h-5 w-5" />
-            <span>Export CSV</span>
+          <button 
+            onClick={handleExportAnalytics}
+            disabled={exportLoading}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-900 text-white rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {exportLoading ? (
+              <Loader className="h-5 w-5 animate-spin" />
+            ) : (
+              <Download className="h-5 w-5" />
+            )}
+            <span>{exportLoading ? 'Exporting...' : 'Export CSV'}</span>
           </button>
         </div>
       </div>
