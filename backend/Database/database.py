@@ -70,7 +70,7 @@ def init_db():
     Initialize database tables.
     Run this once to create all tables defined in schema.py
     """
-    from schema import Base
+    from .schema import Base
     Base.metadata.create_all(bind=engine)
     print("Database tables created successfully!")
 
@@ -79,7 +79,7 @@ def drop_db():
     Drop all database tables.
     WARNING: This will delete all data!
     """
-    from schema import Base
+    from .schema import Base
     Base.metadata.drop_all(bind=engine)
     print("Database tables dropped successfully!")
 
@@ -98,7 +98,7 @@ class DatabaseManager:
     @staticmethod
     def create_complaint(db: Session, complaint_data: dict):
         """Create a new complaint record"""
-        from schema import Complaint
+        from .schema import Complaint
         complaint = Complaint(**complaint_data)
         db.add(complaint)
         db.commit()
@@ -108,13 +108,13 @@ class DatabaseManager:
     @staticmethod
     def get_complaint_by_id(db: Session, complaint_id: str):
         """Retrieve complaint by complaint_id"""
-        from schema import Complaint
+        from .schema import Complaint
         return db.query(Complaint).filter(Complaint.complaint_id == complaint_id).first()
     
     @staticmethod
     def update_complaint_status(db: Session, complaint_id: str, new_status: str):
         """Update complaint status"""
-        from schema import Complaint, CaseStatus
+        from .schema import Complaint, CaseStatus
         complaint = db.query(Complaint).filter(Complaint.complaint_id == complaint_id).first()
         if complaint:
             complaint.status = CaseStatus[new_status]
@@ -125,7 +125,7 @@ class DatabaseManager:
     @staticmethod
     def add_case_activity(db: Session, activity_data: dict):
         """Add a new case activity log"""
-        from schema import CaseActivity
+        from .schema import CaseActivity
         activity = CaseActivity(**activity_data)
         db.add(activity)
         db.commit()
@@ -135,7 +135,7 @@ class DatabaseManager:
     @staticmethod
     def create_bank_action(db: Session, bank_action_data: dict):
         """Create a bank action record"""
-        from schema import BankAction
+        from .schema import BankAction
         bank_action = BankAction(**bank_action_data)
         db.add(bank_action)
         db.commit()
@@ -145,7 +145,7 @@ class DatabaseManager:
     @staticmethod
     def send_notification(db: Session, notification_data: dict):
         """Create a notification record"""
-        from schema import Notification
+        from .schema import Notification
         notification = Notification(**notification_data)
         db.add(notification)
         db.commit()
@@ -155,13 +155,13 @@ class DatabaseManager:
     @staticmethod
     def get_user_by_phone(db: Session, phone_number: str):
         """Retrieve user by phone number"""
-        from schema import User
+        from .schema import User
         return db.query(User).filter(User.phone_number == phone_number).first()
     
     @staticmethod
     def create_or_get_user(db: Session, user_data: dict):
         """Create a new user or return existing user"""
-        from schema import User
+        from .schema import User
         user = db.query(User).filter(User.phone_number == user_data['phone_number']).first()
         if not user:
             user = User(**user_data)
@@ -173,7 +173,7 @@ class DatabaseManager:
     @staticmethod
     def verify_otp(db: Session, phone_number: str, complaint_id: str, otp_code: str):
         """Verify OTP for complaint access"""
-        from schema import OTP
+        from .schema import OTP
         from datetime import datetime
         
         otp_record = db.query(OTP).filter(
@@ -193,7 +193,7 @@ class DatabaseManager:
     @staticmethod
     def get_analytics_summary(db: Session, start_date=None, end_date=None, district=None):
         """Get analytics summary with optional filters"""
-        from schema import Complaint, CaseStatus
+        from .schema import Complaint, CaseStatus
         from sqlalchemy import func
         
         query = db.query(
@@ -216,7 +216,7 @@ class DatabaseManager:
     @staticmethod
     def get_cases_by_status(db: Session, status: str, limit: int = 100, offset: int = 0):
         """Get complaints filtered by status with pagination"""
-        from schema import Complaint, CaseStatus
+        from .schema import Complaint, CaseStatus
         return db.query(Complaint).filter(
             Complaint.status == CaseStatus[status]
         ).offset(offset).limit(limit).all()
